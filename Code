@@ -1,0 +1,69 @@
+#load libraries
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+import numpy as np
+import matplotlib.pyplot as plt
+
+#data loading
+df = pd.read_csv("US_Accidents_March23.csv", low_memory=False)
+
+#select features from data we want to use (they are all numerical features)
+numerical_features = ['Distance(mi)', 'Wind_Speed(mph)', 'Precipitation(in)', 'Visibility(mi)', 'Temperature(F)', 'Humidity(%)']
+
+#select target
+target = 'Severity'
+
+#drop rows w/missing values
+df = df.dropna(subset=numerical_features + [target])
+
+#drop rows w/duplicate values
+df = df.drop_duplicates(subset=numerical_features + [target])
+
+#sample 5% of the data in our data frame for faster computation
+df = df.sample(frac=0.05, random_state=42)
+
+#extract features and target
+X = df[numerical_features]
+y = df[target]
+
+#data splitting
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+#standardize features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+#optimize k with train-validation split
+X_train_part, X_val, y_train_part, y_val = train_test_split(X_train_scaled, y_train, test_size=0.2, random_state=42)
+
+#range of k values to test with
+k_values = range(1, 100, 2)  
+
+#remembers score to compare k values
+cv_scores = []
+
+#loops through k values to find optimal k value
+for k in k_values:
+    knn = KNeighborsClassifier(n_neighbors=k)
+    knn.fit(X_train_part, y_train_part)
+    score = accuracy_score(y_val, knn.predict(X_val))
+    cv_scores.append(score)
+
+    #find the optimal k
+optimal_k = k_values[np.argmax(cv_scores)]
+print(f"The optimal number of neighbors is {optimal_k}")
+
+#plot elbow graph
+plt.plot(k_values, cv_scores, marker='o')
+plt.xlabel('num of neighbors(k)')
+plt.ylabel('accuracy')
+plt.title('accuracy vs num of neighbors (k)')
+plt.show()
+
+#make model w
+knn = KNeighborsClassifier(n_neighbors=optimal_k)
+knn.fit(X_train_scaled, y_train)
